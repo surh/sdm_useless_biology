@@ -93,7 +93,7 @@ Dat <-Dat %>%
                            ID = FALSE))
 Dat
 write_tsv(Dat, "data/carnegieae_gigantea_clean.tsv")
-
-
+terra::writeRaster(bioclim_data, filename = "data/carnegieae_bioclim_raster.tif")
+terra::writeVector(quadrant_map, filename = "data/carnegieae_map")
 
 
