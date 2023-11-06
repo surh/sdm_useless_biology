@@ -7,11 +7,13 @@
 library(tidyverse)
 
 
-#' First we download bioclimate data. This is ignored by git
+#' First we download bioclimate data, and world map. This are ignored by git
+#' in my repo
 bioclim_data <- geodata::worldclim_global(var = "bio",
                                           res = 2.5,
                                           path = "data/")
-
+world_map <- geodata::world(resolution = 3,
+                            path = "data/")
 
 #' Read data downloaded from: https://raw.githubusercontent.com/jcoliver/learn-r/gh-pages/data/Carnegiea-gigantea-GBIF.csv
 Obs <- read_csv("data/Carnegiea-gigantea-GBIF.csv") %>%
@@ -19,30 +21,32 @@ Obs <- read_csv("data/Carnegiea-gigantea-GBIF.csv") %>%
 summary(Obs)
 
 #' Find quadrant where species is located and plot, and plot species data 
-#' with climate
+#' with climate. The index in the plot call indicates which variable to
+#' plot. For variable definitions see: https://www.worldclim.org/data/bioclim.html
 max_lat <- ceiling(max(Obs$latitude))
 min_lat <- floor(min(Obs$latitude))
 max_lon <- ceiling(max(Obs$longitude))
 min_lon <- floor(min(Obs$longitude))
 quadrant <- terra::ext(x = c(min_lon, max_lon, min_lat, max_lat))
 quadrant <- quadrant * 1.25
-world_map <- geodata::world(resolution = 3,
-                            path = "data/")
-quadrant_map <- terra::crop(x = world_map, y = quadrant)
 
-terra::plot(quadrant_map,
-            axes = TRUE, 
-            col = "grey95")
+quadrant_map <- terra::crop(x = world_map, y = quadrant)
+bioclim_data <- terra::crop(x = bioclim_data, y = quadrant)
+
+terra::plot(bioclim_data[[1]])
+# terra::plot(quadrant_map,
+#             axes = TRUE, 
+#             col = "grey95")
 points(x = Obs$longitude, 
        y = Obs$latitude, 
-       col = "olivedrab", 
+       col = "red", 
        pch = 20, 
        cex = 0.75)
 
 
 
-bioclim_data <- crop(x = bioclim_data, y = sample_extent)
-plot(bioclim_data[[1]])
+
+
 
 
 
