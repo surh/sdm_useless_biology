@@ -1,6 +1,6 @@
 # setwd("/Users/sur/lab/exp/2023/today3/")
 
-# Based on: https://jcoliver.github.io/learn-r/011-species-distribution-models.html
+#' Based on: https://jcoliver.github.io/learn-r/011-species-distribution-models.html
 # library(terra)
 # library(geodata)
 # library(predicts)
@@ -13,29 +13,26 @@ bioclim_data <- geodata::worldclim_global(var = "bio",
                                           path = "data/")
 
 
-
-Obs <- read_csv("data/Carnegiea-gigantea-GBIF.csv")
-Obs
-summary(Obs)
-Obs <- Obs %>% 
-  filter(!is.na(latitude))
+#' Read data downloaded from: https://raw.githubusercontent.com/jcoliver/learn-r/gh-pages/data/Carnegiea-gigantea-GBIF.csv
+Obs <- read_csv("data/Carnegiea-gigantea-GBIF.csv") %>%
+    filter(!is.na(latitude))
 summary(Obs)
 
-
+#' Find quadrant where species is located and plot, and plot species data 
+#' with climate
 max_lat <- ceiling(max(Obs$latitude))
 min_lat <- floor(min(Obs$latitude))
 max_lon <- ceiling(max(Obs$longitude))
 min_lon <- floor(min(Obs$longitude))
-geographic_extent <- ext(x = c(min_lon, max_lon, min_lat, max_lat))
+quadrant <- terra::ext(x = c(min_lon, max_lon, min_lat, max_lat))
+quadrant <- quadrant * 1.25
+world_map <- geodata::world(resolution = 3,
+                            path = "data/")
+quadrant_map <- terra::crop(x = world_map, y = quadrant)
 
-
-world_map <- world(resolution = 3,
-                   path = "data/")
-my_map <- crop(x = world_map, y = geographic_extent)
-
-plot(my_map,
-     axes = TRUE, 
-     col = "grey95")
+terra::plot(quadrant_map,
+            axes = TRUE, 
+            col = "grey95")
 points(x = Obs$longitude, 
        y = Obs$latitude, 
        col = "olivedrab", 
@@ -44,7 +41,6 @@ points(x = Obs$longitude,
 
 
 
-sample_extent <- geographic_extent * 1.25
 bioclim_data <- crop(x = bioclim_data, y = sample_extent)
 plot(bioclim_data[[1]])
 
