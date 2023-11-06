@@ -1,15 +1,16 @@
 # setwd("/Users/sur/lab/exp/2023/today3/")
 
-# https://jcoliver.github.io/learn-r/011-species-distribution-models.html
-library(terra)
-library(geodata)
-library(predicts)
+# Based on: https://jcoliver.github.io/learn-r/011-species-distribution-models.html
+# library(terra)
+# library(geodata)
+# library(predicts)
 library(tidyverse)
 
 
-bioclim_data <- worldclim_global(var = "bio",
-                                 res = 2.5,
-                                 path = "data/")
+#' First we download bioclimate data. This is ignored by git
+bioclim_data <- geoddata::worldclim_global(var = "bio",
+                                           res = 2.5,
+                                           path = "data/")
 
 
 
