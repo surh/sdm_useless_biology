@@ -6,6 +6,7 @@
 # library(predicts)
 library(tidyverse)
 
+# Exercise with data from *Carnegiea gigantea* (aka Sahuaro) https://es.wikipedia.org/wiki/Carnegiea_gigantea
 
 #' First we download bioclimate data, and world map. This are ignored by git
 #' in my repo
@@ -43,72 +44,55 @@ points(x = Obs$longitude,
        pch = 20, 
        cex = 0.75)
 
+#' This is presence data, because absence means nothing. **How do we deal with it?**
+#' 
+#' The answer is pseudeo-absence. We create random pseudo-observations and call
+#' them pseudo-absences. We are looking for environmental variables that are
+#' more predictive of true presence than those random draws
 
-
-
-
-
-
-
-
-# Set the seed for the random-number generator to ensure results are similar
+#' To suimulate pseudo-absence and plot it with true presence:
 set.seed(20231106)
-
-# Randomly sample points (same number as our observed points)
 background <- terra::spatSample(x = bioclim_data,
                                 size = 1000,    # generate 1,000 pseudo-absence points
                                 values = FALSE, # don't need values
                                 na.rm = TRUE,   # don't sample from ocean
                                 xy = TRUE)      # just need coordinates
 
-# Look at first few rows of background
-head(background)
 
-# Plot the base map
-plot(my_map,
-     axes = TRUE, 
-     col = "grey95")
-
+terra::plot(bioclim_data[[3]])
+# terra::plot(quadrant_map,
+#             axes = TRUE, 
+#             col = "grey95")
+points(x = Obs$longitude, 
+       y = Obs$latitude, 
+       col = "red", 
+       pch = 20, 
+       cex = 0.75)
 # Add the background points
 points(background,
        col = "grey30",
        pch = 1,
        cex = 0.75)
 
-# Add the points for individual observations
-points(x = Obs$longitude, 
-       y = Obs$latitude, 
-       col = "olivedrab", 
-       pch = 20, 
-       cex = 0.75)
-
-
-
-
+#' Finally we put all the data together and write the file
+head(Obs)
+head(background)
+head(bioclim_data)
 
 Dat <- Obs %>%
   mutate(presence = 1) %>%
-  select(latitude, longitude, presence) %>%
+  # select(latitude, longitude, presence) %>%
   bind_rows(background %>%
               as_tibble() %>%
               mutate(presence = 0) %>%
               rename(longitude = x, latitude = y))
 Dat
-
-
-Dat <- Dat %>% 
+Dat <-Dat %>%
   bind_cols(terra::extract(x = bioclim_data,
-                       y = Dat %>% select(longitude, latitude),
-                       ID = FALSE))
+                           y = Dat %>% select(longitude, latitude),
+                           ID = FALSE))
 Dat
-
-
-Dat_folds <- predicts::folds(x = Dat,
-                             k = 5,
-                             by = Dat$presence)
-table(Dat_folds)
-str(Dat_folds)
-
+write_tsv(Dat, "data/carnegieae_gigantea_clean.tsv")
 
 
 
