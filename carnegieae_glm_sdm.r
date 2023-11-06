@@ -88,31 +88,31 @@ points(x = Dat$longitude[ Dat$presence == 1],
        pch = 20, 
        cex = 0.75)
 
-#' # Make a better model
-Dat %>%
-  select(-gbifid, -latitude, -longitude, -presence) %>%
-  cor %>% replace(list = . < 0.7, values = 0) %>%
-  heatmap()
-
-
-m2 <- glm(presence ~ wc2.1_2.5m_bio_12 +
-            I(wc2.1_2.5m_bio_12^2) +
-            wc2.1_2.5m_bio_18 +
-            I(wc2.1_2.5m_bio_18^2),
-
-          family = binomial(link = "logit"),
-          data = Dat %>%
-            filter(ii_folds != 5) %>%
-            select(-gbifid, -latitude, -longitude))
-summary(m2)
-AIC(m1,m2)
-m2_eval <- predicts::pa_evaluate(p = Dat %>%
-                                   filter(ii_folds == 5 & presence == 1),
-                                 a = Dat %>%
-                                   filter(ii_folds == 5 & presence == 0),
-                                 model = m2,
-                                 type = "response")
-m2_eval
+#' #' # Make a better model
+#' Dat %>%
+#'   select(-gbifid, -latitude, -longitude, -presence) %>%
+#'   cor %>% replace(list = . < 0.7, values = 0) %>%
+#'   heatmap()
+#' 
+#' 
+#' m2 <- glm(presence ~ wc2.1_2.5m_bio_12 +
+#'             I(wc2.1_2.5m_bio_12^2) +
+#'             wc2.1_2.5m_bio_18 +
+#'             I(wc2.1_2.5m_bio_18^2),
+#' 
+#'           family = binomial(link = "logit"),
+#'           data = Dat %>%
+#'             filter(ii_folds != 5) %>%
+#'             select(-gbifid, -latitude, -longitude))
+#' summary(m2)
+#' AIC(m1,m2)
+#' m2_eval <- predicts::pa_evaluate(p = Dat %>%
+#'                                    filter(ii_folds == 5 & presence == 1),
+#'                                  a = Dat %>%
+#'                                    filter(ii_folds == 5 & presence == 0),
+#'                                  model = m2,
+#'                                  type = "response")
+#' m2_eval
 
 #' # Random forest
 rf1 <- randomForest::randomForest(x = Dat %>%
@@ -132,11 +132,24 @@ randomForest::partialPlot(x = rf1,
                           x.var = wc2.1_2.5m_bio_12,
                           which.class = "1")
 
+#' # Maxent
+me1 <- dismo::maxent(x = terra::extract(x = bioclim_data,
+                                        y = Dat %>%
+                                          select(longitude, latitude),
+                                        ID = FALSE),
+                     p = Dat$presence)
+dismo::response(me1)
+me1_predictions <- dismo::predict(me1, forecast_bioclim)
 
-predicts::partialResponse(m2, data = Dat, var = "wc2.1_2.5m_bio_12") %>%
-  ggplot(aes(x = wc2.1_2.5m_bio_12, y = p)) +
-  geom_line() +
-  geom_point() +
-  theme_classic()
-
+terra::plot(quadrant_map, 
+            axes = TRUE, 
+            col = "grey95")
+terra::plot(me1_predictions, 
+            add = TRUE, 
+            legend = TRUE)
+points(x = Dat$longitude[ Dat$presence == 1], 
+       y = Dat$latitude[ Dat$presence == 1], 
+       col = "red",
+       pch = 20, 
+       cex = 0.75)
 
