@@ -6,7 +6,7 @@
 # library(predicts)
 library(tidyverse)
 
-# Exercise with data from *Carnegiea gigantea* (aka Sahuaro) https://es.wikipedia.org/wiki/Carnegiea_gigantea
+#' Exercise with data from *Carnegiea gigantea* (aka Sahuaro) https://es.wikipedia.org/wiki/Carnegiea_gigantea
 
 #' First we download bioclimate data, and world map. This are ignored by git
 #' in my repo
