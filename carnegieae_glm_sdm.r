@@ -71,4 +71,46 @@ points(x = Dat$longitude[ Dat$presence == 1],
        pch = 20, 
        cex = 0.75)
 
+#' **Excercise: Forecast species range in the future according to model**
+forecast_bioclim <- terra::rast("data/carnegieae_forecast_raster.tif")
+map_forecast <- terra::predict(forecast_bioclim, m1, type = "response")
+
+terra::plot(quadrant_map, 
+            axes = TRUE, 
+            col = "grey95")
+terra::plot(map_forecast > m1_eval@thresholds$max_spec_sens, 
+            add = TRUE, 
+            legend = FALSE, 
+            col = c(NA, "olivedrab"))
+points(x = Dat$longitude[ Dat$presence == 1], 
+       y = Dat$latitude[ Dat$presence == 1], 
+       col = "red",
+       pch = 20, 
+       cex = 0.75)
+
+#' # Make a better model
+Dat %>%
+  select(-gbifid, -latitude, -longitude, -presence) %>%
+  cor %>% replace(list = . < 0.7, values = 0) %>%
+  heatmap()
+
+
+m2 <- glm(presence ~ wc2.1_2.5m_bio_4 +
+            wc2.1_2.5m_bio_6 +
+            wc2.1_2.5m_bio_8 +
+            wc2.1_2.5m_bio_12 +
+            wc2.1_2.5m_bio_13 +
+            wc2.1_2.5m_bio_14 +
+            wc2.1_2.5m_bio_15,
+          family = binomial(link = "logit"),
+          data = Dat %>%
+            filter(ii_folds != 5) %>%
+            select(-gbifid, -latitude, -longitude))
+summary(m2)
+m2_eval <- predicts::pa_evaluate(p = Dat %>%
+                                   filter(ii_folds == 5 & presence == 1),
+                                 a = Dat %>%
+                                   filter(ii_folds == 5 & presence == 0),
+                                 model = m2,
+                                 type = "response")
 

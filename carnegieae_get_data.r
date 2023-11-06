@@ -97,3 +97,14 @@ terra::writeRaster(bioclim_data, filename = "data/carnegieae_bioclim_raster.tif"
 terra::writeVector(quadrant_map, filename = "data/carnegieae_map")
 
 
+#' # Forecast data
+# Download predicted climate data
+forecast_data <- geodata::cmip6_world(model = "MPI-ESM1-2-HR",
+                                      ssp = "245",
+                                      time = "2061-2080",
+                                      var = "bioc",
+                                      res = 2.5,
+                                      path = "data")
+forecast_data <- terra::crop(forecast_data, quadrant)
+names(forecast_data) <- names(bioclim_data)
+terra::writeRaster(forecast_data, filename = "data/carnegieae_forecast_raster.tif")
