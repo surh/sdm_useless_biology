@@ -8,9 +8,9 @@ library(tidyverse)
 
 
 #' First we download bioclimate data. This is ignored by git
-bioclim_data <- geoddata::worldclim_global(var = "bio",
-                                           res = 2.5,
-                                           path = "data/")
+bioclim_data <- geodata::worldclim_global(var = "bio",
+                                          res = 2.5,
+                                          path = "data/")
 
 
 
