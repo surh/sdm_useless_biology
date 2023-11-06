@@ -95,22 +95,48 @@ Dat %>%
   heatmap()
 
 
-m2 <- glm(presence ~ wc2.1_2.5m_bio_4 +
-            wc2.1_2.5m_bio_6 +
-            wc2.1_2.5m_bio_8 +
-            wc2.1_2.5m_bio_12 +
-            wc2.1_2.5m_bio_13 +
-            wc2.1_2.5m_bio_14 +
-            wc2.1_2.5m_bio_15,
+m2 <- glm(presence ~ wc2.1_2.5m_bio_12 +
+            I(wc2.1_2.5m_bio_12^2) +
+            wc2.1_2.5m_bio_18 +
+            I(wc2.1_2.5m_bio_18^2),
+
           family = binomial(link = "logit"),
           data = Dat %>%
             filter(ii_folds != 5) %>%
             select(-gbifid, -latitude, -longitude))
 summary(m2)
+AIC(m1,m2)
 m2_eval <- predicts::pa_evaluate(p = Dat %>%
                                    filter(ii_folds == 5 & presence == 1),
                                  a = Dat %>%
                                    filter(ii_folds == 5 & presence == 0),
                                  model = m2,
                                  type = "response")
+m2_eval
+
+#' # Random forest
+rf1 <- randomForest::randomForest(x = Dat %>%
+                                    select(-gbifid, -latitude, -longitude, -presence),
+                                  y = Dat$presence %>% as.factor,
+                                  # y = Dat$presence, 
+                                  ntree = 1e3,
+                                  nodesize = 10,
+                                  importance = TRUE)
+rf1
+randomForest::importance(rf1)
+randomForest::varImpPlot(rf1)
+randomForest::partialPlot(x = rf1,
+                          pred.data = Dat %>%
+                            select(-gbifid, -latitude, -longitude, -presence) %>%
+                            as.data.frame(), 
+                          x.var = wc2.1_2.5m_bio_12,
+                          which.class = "1")
+
+
+predicts::partialResponse(m2, data = Dat, var = "wc2.1_2.5m_bio_12") %>%
+  ggplot(aes(x = wc2.1_2.5m_bio_12, y = p)) +
+  geom_line() +
+  geom_point() +
+  theme_classic()
+
 
