@@ -1,170 +1,149 @@
 library(tidyverse)
 
+#' Read data and combine bioclimatic variables with observations
 Dat <- read_csv("data/teosintle_maxent_input.csv")
 bioclim <- terra::rast("data/teosintle_bioclim_raster.tif")
-Dat <-Dat %>%
-  bind_cols(terra::extract(x = bioclim,
-                           y = Dat %>% select(lon, lat),
-                           ID = FALSE))
-
-me_g1 <- dismo::maxent(x = as(bioclim, "Raster") ,
-                       p = Dat %>%
-                         filter(ID == "g1") %>%
-                         select(lon, lat) %>%
-                         as.data.frame())
-me_g2 <- dismo::maxent(x = as(bioclim, "Raster") ,
-                       p = Dat %>%
-                         filter(ID == "g2") %>%
-                         select(lon, lat) %>%
-                         as.data.frame())
-me_all <- dismo::maxent(x = as(bioclim, "Raster") ,
-                       p = Dat %>%
-                         filter(ID == "all") %>%
-                         select(lon, lat) %>%
-                         as.data.frame())
-dismo::plot(me_g1)
-dismo::plot(me_g2)
-dismo::plot(me_g3)
 
 
-myfun <- function(x, p, args=NULL, path, ...) {
+#' Run maxent
+#' 
+#' Performs variable selection and then runs maxent on presence only data
+#'
+#' @param Dat A data.frame or tibble with one row per presence
+#' observation
+#' @param bioclim A "SpatRaster" object. Should be already cropped to quadran
+#' of interest
+#' @param lon_lat A character vector with the names of the columns in Dat
+#' corresponding to longitude and latitude. I that order. 
+#'
+#' @return A MaEnt model
+#' @export
+#'
+#' @examples
+model_maxent <- function(Dat, bioclim,
+                         lon_lat = c("lon", "lat"),
+                         cor_thres = 0.7){
   
-  stopifnot(dismo::maxent(silent=TRUE))
-  
-  cat("Hello\n")
-  x <- cbind(p, x)
-  cat("bye\n")
-  x <- stats::na.omit(x)
-  x[is.na(x)] <- -9999  # maxent flag for NA, unless changed with args(nodata= ), so we should check for that rather than use this fixed value.
-  
-  p <- x[,1]
-  x <- x[, -1 ,drop=FALSE]
-  
-  factors <- NULL
-  for (i in 1:ncol(x)) {
-    if (inherits(x[,i], 'factor')) {
-      factors <- c(factors, colnames(x)[i])
-    }
-  }
-  
-  if (!missing(path)) {
-    path <- trim(path)
-    dir.create(path, recursive=TRUE, showWarnings=FALSE)
-    if (!file.exists(path)) {
-      stop('cannot create output directory: ', path)
-    }
-    dirout <- path			
-  } else {
-    dirout <- .meTmpDir()
-    f <- paste(round(runif(10)*10), collapse="")
-    dirout <- paste(dirout, '/', f, sep='')
-    dir.create(dirout, recursive=TRUE, showWarnings=FALSE)
-    if (! file.exists(dirout)) {
-      stop('cannot create output directory: ', f)
-    }
-  }
-  
-  pv <- x[p==1, ,drop=FALSE]
-  av <- x[p==0, ,drop=FALSE]
-  me <- new('MaxEnt')
-  me@presence <- pv
-  me@absence <- av
-  me@hasabsence <- TRUE
-  me@path <- dirout
-  
-  pv <- cbind(data.frame(species='species'), x=1:nrow(pv), y=1:nrow(pv), pv)
-  av <- cbind(data.frame(species='background'), x=1:nrow(av), y=1:nrow(av), av)
-  
-  pfn <- paste(dirout, '/presence', sep="")
-  afn <- paste(dirout, '/absence', sep="")
-  write.table(pv, file=pfn, sep=',', row.names=FALSE)
-  write.table(av, file=afn, sep=',', row.names=FALSE)
-  
-  mxe <- rJava::.jnew("mebridge")
-  
-  names(args) = NULL
-  replicates <- .getreps(args) 
-  args <- c("-z", args)
-  
-  if (is.null(factors)) {
-    str <- rJava::.jcall(mxe, "S", "fit", c("autorun", "-e", afn, "-o", dirout, "-s", pfn, args)) 
-  } else {
-    str <- rJava::.jcall(mxe, "S", "fit", c("autorun", "-e", afn, "-o", dirout, "-s", pfn, args), rJava::.jarray(factors))
-  }
-  if (!is.null(str)) {
-    stop("args not understood:\n", str)
-  }
+  # Remove colinear variables, use Variance Inflation Factor.
+  selected_vars <- fuzzySim::corSelect(data = terra::extract(x = bioclim,
+                                                            y = Dat %>%
+                                                              select(lon, lat),
+                                                            ID = FALSE),
+                      var.cols = names(bioclim),
+                      coeff = TRUE,
+                      cor.thresh = cor_thres,
+                      select = "VIF",
+                      method = "pearson")
+  bioclim <- bioclim[[selected_vars$selected.vars]]
   
   
-  if (replicates > 1) {
-    
-    mer <- new('MaxEntReplicates')
-    d <- t(read.csv(paste(dirout, '/maxentResults.csv', sep='') ))
-    d1 <- d[1,]
-    d <- d[-1, ,drop=FALSE]
-    dd <- matrix(as.numeric(d), ncol=ncol(d))
-    rownames(dd) <- rownames(d)
-    colnames(dd) <- d1
-    mer@results <- dd
-    f <- paste(dirout, "/species.html", sep='')
-    html <- readLines(f)
-    html[1] <- "<title>Maxent model</title>"
-    html[2] <- "<CENTER><H1>Maxent model</H1></CENTER>"
-    html[3] <- sub("model for species", "model result", html[3])
-    newtext <- paste("using 'dismo' version ", packageDescription('dismo')$Version, "& Maxent version")
-    html[3] <- sub("using Maxent version", newtext, html[3])
-    f <- paste(dirout, "/maxent.html", sep='')
-    writeLines(html, f)	
-    mer@html <- f
-    
-    for (i in 0:(replicates-1)) {	
-      mex <- me
-      mex@lambdas <- unlist( readLines( paste(dirout, '/species_', i, '.lambdas', sep='') ) )
-      
-      f <- paste(mex@path, "/species_", i, ".html", sep='')
-      html <- readLines(f)
-      html[1] <- "<title>Maxent model</title>"
-      html[2] <- "<CENTER><H1>Maxent model</H1></CENTER>"
-      html[3] <- sub("model for species", "model result", html[3])
-      newtext <- paste("using 'dismo' version ", packageDescription('dismo')$Version, "& Maxent version")
-      html[3] <- sub("using Maxent version", newtext, html[3])
-      f <- paste(mex@path, "/maxent_", i, ".html", sep='')
-      writeLines(html, f)
-      mex@html <- f
-      mer@models[[i+1]] <- mex
-      mer@models[[i+1]]@results <- dd[, 1+1, drop=FALSE]				
-    }
-    
-    return(mer)
-    
-  } else {
-    
-    me@lambdas <- unlist( readLines( paste(dirout, '/species.lambdas', sep='') ) )
-    d <- t(read.csv(paste(dirout, '/maxentResults.csv', sep='') ))
-    d <- d[-1, ,drop=FALSE]
-    dd <- matrix(as.numeric(d))
-    rownames(dd) <- rownames(d)
-    me@results <- dd
-    
-    f <- paste(me@path, "/species.html", sep='')
-    html <- readLines(f)
-    html[1] <- "<title>Maxent model</title>"
-    html[2] <- "<CENTER><H1>Maxent model</H1></CENTER>"
-    html[3] <- sub("model for species", "model result", html[3])
-    newtext <- paste("using 'dismo' version ", packageDescription('dismo')$Version, "& Maxent version")
-    html[3] <- sub("using Maxent version", newtext, html[3])
-    f <- paste(me@path, "/maxent.html", sep='')
-    writeLines(html, f)	
-    me@html <- f
-  }
+  me <- dismo::maxent(x = as(bioclim, "Raster"),
+                      p = Dat %>%
+                        select(all_of(lon_lat)) %>%
+                        as.data.frame(),
+                      nbg = 1e4)
   
-  me
+  return(me)
 }
 
 
-me_g1 <- myfun(x = Dat %>%
-                         filter(ID == "g1") %>%
-                         select(-ID, -lon, -lat) %>%
-                         as.data.frame(),
-                       p = rep(1, sum(Dat$ID == "g1")))
+#' Run models on each group and combined
+me_g1 <- model_maxent(Dat = Dat %>%
+                        filter(ID == "g1"),
+                      bioclim = bioclim,
+                      lon_lat = c("lon", "lat"),
+                      cor_thres = 0.7)
+me_g2 <-  model_maxent(Dat = Dat %>%
+                         filter(ID == "g2"),
+                       bioclim = bioclim,
+                       lon_lat = c("lon", "lat"),
+                       cor_thres = 0.7)
+me_all <-  model_maxent(Dat = Dat %>%
+                          filter(ID == "all"),
+                        bioclim = bioclim,
+                        lon_lat = c("lon", "lat"),
+                        cor_thres = 0.7)
+op <- par(mfrow = c(1, 3))
+dismo::plot(me_g1)
+dismo::plot(me_g2)
+dismo::plot(me_all)
+par(op)
+
+g1_pred <- terra::predict(as(bioclim, "Raster"), me_g1)
+g2_pred <- terra::predict(as(bioclim, "Raster"), me_g2)
+
+#' Forecast into the future
+bioclim6180 <- terra::rast("data/teosintle_forecast_2061-2080_raster.tif")
+bioclim81100 <- terra::rast("data/teosintle_forecast_2081-2100_raster.tif")
+
+g1_forecast_6180 <- terra::predict(as(bioclim6180, "Raster"), me_g1)
+g1_forecast_81100 <- terra::predict(as(bioclim81100, "Raster"), me_g1)
+
+
+g2_forecast_6180 <- terra::predict(as(bioclim6180, "Raster"), me_g2)
+g2_forecast_81100 <- terra::predict(as(bioclim81100, "Raster"), me_g2)
+
+#' Read map and plot
+quadrant_map <- terra::vect("data/teosintle_map/")
+
+
+op <- par(mfrow=c(3,2))
+terra::plot(quadrant_map, col = "white", main = "Now")
+terra::plot(g1_pred, add = TRUE, col = colorRampPalette(c("white", "red"))(10))
+points(Dat %>% filter(ID == "g1") %>% select(lon, lat), pch = 21, bg = "darkred", col = "black")
+terra::plot(quadrant_map, add=TRUE, border='dark grey')
+
+terra::plot(quadrant_map, col = "white", main = "now")
+terra::plot(g2_pred, add = TRUE, col = colorRampPalette(c("white", "blue"))(10))
+points(Dat %>% filter(ID == "g2") %>% select(lon, lat), pch = 21, bg = "darkblue", col = "black")
+terra::plot(quadrant_map, add=TRUE, border='dark grey')
+
+
+
+terra::plot(quadrant_map, col = "white", main = "2061-2080")
+terra::plot(g1_forecast_6180, add = TRUE, col = colorRampPalette(c("white", "red"))(10))
+points(Dat %>% filter(ID == "g1") %>% select(lon, lat), pch = 21, bg = "darkred", col = "black")
+terra::plot(quadrant_map, add=TRUE, border='dark grey')
+
+terra::plot(quadrant_map, col = "white", main = "2061-2081")
+terra::plot(g2_forecast_6180, add = TRUE, col = colorRampPalette(c("white", "blue"))(10))
+points(Dat %>% filter(ID == "g2") %>% select(lon, lat), pch = 21, bg = "darkblue", col = "black")
+terra::plot(quadrant_map, add=TRUE, border='dark grey')
+
+
+
+terra::plot(quadrant_map, col = "white", main = "2081-2100")
+terra::plot(g1_forecast_81100, add = TRUE, col = colorRampPalette(c("white", "red"))(10))
+points(Dat %>% filter(ID == "g1") %>% select(lon, lat), pch = 21, bg = "darkred", col = "black")
+terra::plot(quadrant_map, add=TRUE, border='dark grey')
+
+terra::plot(quadrant_map, col = "white", main = "2081-2100")
+terra::plot(g2_forecast_81100, add = TRUE, col = colorRampPalette(c("white", "blue"))(10))
+points(Dat %>% filter(ID == "g2") %>% select(lon, lat), pch = 21, bg = "darkblue", col = "black")
+terra::plot(quadrant_map, add=TRUE, border='dark grey')
+par(op)
+
+
+
+
+
+
+raster::extract(bioclim, Dat %>% select(c("lon", "lat")))
+table(Dat$ID)
+
+
+
+ENMeval::ENMevaluate(occs = Dat %>% filter(ID == "g1") %>% select(lon, lat) %>% as.data.frame(),
+                     envs = as(bioclim , "Raster"),
+                     tune.args = list(rm = c(0.5, 1 , 1.5),
+                                      fc = unlist(sapply(1:5, function(x) apply(combn(c("L","Q","H","P","T"), x), 2, function(y) paste(y, collapse = ""))))),
+                     bg.coords = NULL,
+                     clamp=FALSE,
+            algorithm = "maxnet",
+            method = 'jackknife',
+            parallel = TRUE,
+            numCores = 8)
+
+
+
 
