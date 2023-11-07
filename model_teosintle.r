@@ -125,24 +125,18 @@ par(op)
 
 
 
-
-
-
-raster::extract(bioclim, Dat %>% select(c("lon", "lat")))
-table(Dat$ID)
-
-
-
-ENMeval::ENMevaluate(occs = Dat %>% filter(ID == "g1") %>% select(lon, lat) %>% as.data.frame(),
-                     envs = as(bioclim , "Raster"),
-                     tune.args = list(rm = c(0.5, 1 , 1.5),
-                                      fc = unlist(sapply(1:5, function(x) apply(combn(c("L","Q","H","P","T"), x), 2, function(y) paste(y, collapse = ""))))),
-                     bg.coords = NULL,
-                     clamp=FALSE,
-            algorithm = "maxnet",
-            method = 'jackknife',
-            parallel = TRUE,
-            numCores = 8)
+#' For more systematic evaluation of the models
+#' Takes a while to run
+# eval <- ENMeval::ENMevaluate(occs = Dat %>% filter(ID == "g1") %>% select(lon, lat) %>% as.data.frame(),
+#                      envs = as(bioclim , "Raster"),
+#                      tune.args = list(rm = c(0.5, 1 , 1.5),
+#                                       fc = unlist(sapply(1:5, function(x) apply(combn(c("L","Q","H","P","T"), x), 2, function(y) paste(y, collapse = ""))))),
+#                      bg.coords = NULL,
+#                      clamp=FALSE,
+#             algorithm = "maxnet",
+#             method = 'jackknife',
+#             parallel = TRUE,
+#             numCores = 8)
 
 
 
