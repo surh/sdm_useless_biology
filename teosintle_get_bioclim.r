@@ -71,7 +71,7 @@ terra::writeRaster(forecast_data,
 sessionInfo()
 
 
-#' Generate all combinations of models, pathways, and time periods to
+#' List all  of models, pathways, and time periods to
 #' download forecast data
 model <- c("ACCESS-CM2", "ACCESS-ESM1-5", "AWI-CM-1-1-MR", "BCC-CSM2-MR", 
   "CanESM5", "CanESM5-CanOE", "CMCC-ESM2", "CNRM-CM6-1", "CNRM-CM6-1-HR",
@@ -81,13 +81,13 @@ model <- c("ACCESS-CM2", "ACCESS-ESM1-5", "AWI-CM-1-1-MR", "BCC-CSM2-MR",
   "MPI-ESM1-2-LR", "MRI-ESM2-0", "UKESM1-0-LL")
 ssp <- c("126", "245", "370", "585")
 time <- c("2041-2060", "2061-2080", "2081-2100")
-forecasts <- expand.grid(model = model, ssp = ssp, time = time)
 
 
-#' Download all forecast data, cropping each forecast the quadrant and
-#' saving for future use
+
+#' Download all forecast data, for all combinations of models, pathways and
+#' timeframes. Crop each forecast the species quadrant, and save for future use.
 #' This will take a long time to run (100s of MB per combination)
-forecasts %>%
+expand.grid(model = model, ssp = ssp, time = time) %>%
   mutate(path = paste0("data/teosintle_forecast_",
                        time, "_", ssp, "_", model, ".tif")) %>%
   rowwise() %>%
@@ -96,10 +96,13 @@ forecasts %>%
                                               time = time,
                                               var = "bioc",
                                               res = 2.5,
-                                              path = "data"))) %>%
+                                              path = "data")))  %>%
   mutate(forecast = list(terra::crop(forecast, quadrant))) %>%
   mutate(forecast = list(terra::writeRaster(forecast, filename = path))) %>%
   ungroup()
+
+
+
 
 
 
