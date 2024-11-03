@@ -6,7 +6,7 @@ bioclim <- terra::rast("data/teosintle_bioclim_raster.tif")
 
 
 #' Run maxent
-#' 
+#'
 #' Performs variable selection and then runs maxent on presence only data
 #'
 #' @param Dat A data.frame or tibble with one row per presence
@@ -22,30 +22,34 @@ bioclim <- terra::rast("data/teosintle_bioclim_raster.tif")
 #' @examples
 model_maxent <- function(Dat, bioclim,
                          lon_lat = c("lon", "lat"),
-                         cor_thres = 0.7){
-  
+                         cor_thres = 0.7) {
   # Remove colinear variables, use Variance Inflation Factor.
-  selected_vars <- fuzzySim::corSelect(data = terra::extract(x = bioclim,
-                                                            y = Dat %>%
-                                                              select(lon, lat),
-                                                            ID = FALSE),
-                      var.cols = names(bioclim),
-                      coeff = TRUE,
-                      cor.thresh = cor_thres,
-                      select = "VIF",
-                      method = "pearson")
+  selected_vars <- fuzzySim::corSelect(
+    data = terra::extract(
+      x = bioclim,
+      y = Dat %>%
+        select(lon, lat),
+      ID = FALSE
+    ),
+    var.cols = names(bioclim),
+    coeff = TRUE,
+    cor.thresh = cor_thres,
+    select = "VIF",
+    method = "pearson"
+  )
   bioclim <- bioclim[[selected_vars$selected.vars]]
-  
-  
-  me <- dismo::maxent(x = as(bioclim, "Raster"),
-                      p = Dat %>%
-                        select(all_of(lon_lat)) %>%
-                        as.data.frame(),
-                      nbg = 1e4)
-  
+
+
+  me <- dismo::maxent(
+    x = as(bioclim, "Raster"),
+    p = Dat %>%
+      select(all_of(lon_lat)) %>%
+      as.data.frame(),
+    nbg = 1e4
+  )
+
   return(me)
 }
-
 
 #' Run models on each group and combined
 me_g1 <- model_maxent(Dat = Dat %>%
@@ -92,37 +96,61 @@ quadrant_map <- terra::vect("data/teosintle_map/")
 
 op <- par(mfrow=c(3,2))
 terra::plot(quadrant_map, col = "white", main = "Now")
-terra::plot(g1_pred, add = TRUE, col = colorRampPalette(c("white", "red"))(10))
-points(Dat %>% filter(ID == "g1") %>% select(lon, lat), pch = 21, bg = "darkred", col = "black")
+terra::plot(g1_pred,
+  add = TRUE,
+  col = colorRampPalette(c("white", "red"))(10)
+)
+points(Dat %>% filter(ID == "g1") %>%
+  select(lon, lat), pch = 21, bg = "darkred", col = "black")
 terra::plot(quadrant_map, add=TRUE, border='dark grey')
 
 terra::plot(quadrant_map, col = "white", main = "now")
-terra::plot(g2_pred, add = TRUE, col = colorRampPalette(c("white", "blue"))(10))
-points(Dat %>% filter(ID == "g2") %>% select(lon, lat), pch = 21, bg = "darkblue", col = "black")
+terra::plot(g2_pred,
+  add = TRUE,
+  col = colorRampPalette(c("white", "blue"))(10)
+)
+points(Dat %>% filter(ID == "g2") %>%
+  select(lon, lat), pch = 21, bg = "darkblue", col = "black")
 terra::plot(quadrant_map, add=TRUE, border='dark grey')
 
 
 
 terra::plot(quadrant_map, col = "white", main = "2061-2080")
-terra::plot(g1_forecast_6180, add = TRUE, col = colorRampPalette(c("white", "red"))(10))
-points(Dat %>% filter(ID == "g1") %>% select(lon, lat), pch = 21, bg = "darkred", col = "black")
+terra::plot(g1_forecast_6180,
+  add = TRUE,
+  col = colorRampPalette(c("white", "red"))(10)
+)
+points(Dat %>% filter(ID == "g1") %>%
+  select(lon, lat), pch = 21, bg = "darkred", col = "black")
 terra::plot(quadrant_map, add=TRUE, border='dark grey')
 
 terra::plot(quadrant_map, col = "white", main = "2061-2081")
-terra::plot(g2_forecast_6180, add = TRUE, col = colorRampPalette(c("white", "blue"))(10))
-points(Dat %>% filter(ID == "g2") %>% select(lon, lat), pch = 21, bg = "darkblue", col = "black")
+terra::plot(g2_forecast_6180,
+  add = TRUE,
+  col = colorRampPalette(c("white", "blue"))(10)
+)
+points(Dat %>% filter(ID == "g2") %>%
+  select(lon, lat), pch = 21, bg = "darkblue", col = "black")
 terra::plot(quadrant_map, add=TRUE, border='dark grey')
 
 
 
 terra::plot(quadrant_map, col = "white", main = "2081-2100")
-terra::plot(g1_forecast_81100, add = TRUE, col = colorRampPalette(c("white", "red"))(10))
-points(Dat %>% filter(ID == "g1") %>% select(lon, lat), pch = 21, bg = "darkred", col = "black")
+terra::plot(g1_forecast_81100,
+  add = TRUE, 
+  col = colorRampPalette(c("white", "red"))(10)
+)
+points(Dat %>% filter(ID == "g1") %>%
+  select(lon, lat), pch = 21, bg = "darkred", col = "black")
 terra::plot(quadrant_map, add=TRUE, border='dark grey')
 
 terra::plot(quadrant_map, col = "white", main = "2081-2100")
-terra::plot(g2_forecast_81100, add = TRUE, col = colorRampPalette(c("white", "blue"))(10))
-points(Dat %>% filter(ID == "g2") %>% select(lon, lat), pch = 21, bg = "darkblue", col = "black")
+terra::plot(g2_forecast_81100,
+  add = TRUE,
+  col = colorRampPalette(c("white", "blue"))(10)
+)
+points(Dat %>% filter(ID == "g2") %>%
+  select(lon, lat), pch = 21, bg = "darkblue", col = "black")
 terra::plot(quadrant_map, add=TRUE, border='dark grey')
 par(op)
 
@@ -142,27 +170,29 @@ par(op)
 #             numCores = 8)
 
 
+library(tidyverse)
 library(biomod2)
 
 Dat <- read_csv("data/teosintle_maxent_input.csv")
 bioclim <- terra::rast("data/teosintle_bioclim_raster.tif")
-Dat
+bioclim6180 <- terra::rast("data/teosintle_forecast_2061-2080_245_CMCC-ESM2.tif")
+names(bioclim6180) <- names(bioclim)
+
+quadrant_map <- terra::vect("data/teosintle_map/")
 
 
-g1.bmdata <- BIOMOD_FormatingData(resp.var = ifelse(Dat$ID == "g1",
-                                       1, NA),
-                     expl.var = bioclim,
-                     resp.xy = Dat[,c("lon", "lat")],
-                     resp.name = "g1",
-                     PA.nb.rep = 4,
-                     PA.nb.absences = 1000,
-                     PA.strategy = 'random',
-                     filter.raster = TRUE)
+g1.bmd <- BIOMOD_FormatingData(
+  resp.var = ifelse(Dat$ID == "g1", 1, NA),
+  expl.var = bioclim,
+  resp.xy = Dat[, c("lon", "lat")],
+  resp.name = "g1", PA.nb.rep = 4,
+  PA.nb.absences = 1000,
+  PA.strategy = "random",
+  filter.raster = TRUE
+)
 
 
-
-
-g1.bm <- BIOMOD_Modeling(bm.format = g1.bmdata,
+g1.bm <- BIOMOD_Modeling(bm.format = g1.bmd,
                          modeling.id = "g1.bm",
                          models = c("MAXNET"),
                          CV.strategy = 'random',

@@ -7,3 +7,4 @@ data/wc2.1_2.5m/
 data/climate/
 data/gadm/
 *.DS_Store
+.lintr

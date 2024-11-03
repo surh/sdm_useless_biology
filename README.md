@@ -19,4 +19,5 @@ Based on the code from:
   * biomod2
   * tidyterra
   * ggtext
+  * maxnet
   
