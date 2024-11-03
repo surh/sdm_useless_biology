@@ -13,9 +13,10 @@ Based on the code from:
 - R packages
   * tidyverse
   * geodata
+  * raster
   * terra
   * sp
   * biomod2
-  * dismo
   * tidyterra
   * ggtext
+  
