@@ -16,3 +16,6 @@ Based on the code from:
   * terra
   * sp
   * biomod2
+  * dismo
+  * tidyterra
+  * ggtext
