@@ -13,23 +13,23 @@ quadrant_map <- terra::vect("data/teosintle_map/")
 
 #' # Using the biomod2 package
 
-pop <- "g2"
+pop <- "g1"
 
 #' Prepare data
-g1.bmd <- BIOMOD_FormatingData(
-    resp.var = rep(1, sum(Dat$ID == pop)),
-    expl.var = bioclim,
-    resp.xy = Dat %>% filter(ID == pop) %>% select(lon, lat),
-    resp.name = pop,
-    PA.nb.rep = 4,
-    PA.nb.absences = 1000,
-    PA.strategy = "random",
-    filter.raster = TRUE
-  )
+bmd <- BIOMOD_FormatingData(
+  resp.var = rep(1, sum(Dat$ID == pop)),
+  expl.var = bioclim,
+  resp.xy = Dat %>% filter(ID == pop) %>% select(lon, lat),
+  resp.name = pop,
+  PA.nb.rep = 4,
+  PA.nb.absences = 1000,
+  PA.strategy = "random",
+  filter.raster = TRUE
+)
 
 #' Run models
-g1.bm <- BIOMOD_Modeling(
-  bm.format = g1.bmd,
+bm1 <- BIOMOD_Modeling(
+  bm.format = bmd,
   modeling.id = paste0(pop, ".bm"),
   models = c("MAXNET"),
   CV.strategy = "random",
@@ -41,8 +41,8 @@ g1.bm <- BIOMOD_Modeling(
 )
 
 #' Project models
-g1_curr.bmp <- BIOMOD_Projection(
-  bm.mod = g1.bm,
+bmp1_curr <- BIOMOD_Projection(
+  bm.mod = bm1,
   proj.name = "Now",
   new.env = bioclim,
   models.chosen = "all",
@@ -51,8 +51,8 @@ g1_curr.bmp <- BIOMOD_Projection(
   build.clamping.mask = TRUE
 )
 
-g1_fut.bmp <- BIOMOD_Projection(
-  bm.mod = g1.bm,
+bmp1_fut <- BIOMOD_Projection(
+  bm.mod = bm1,
   proj.name = "Future",
   new.env = bioclim_fut,
   models.chosen = "all",
@@ -61,42 +61,50 @@ g1_fut.bmp <- BIOMOD_Projection(
   build.clamping.mask = TRUE
 )
 
-#' # Explore results with biomod2 functions
-
-# # Get evaluation scores & variables importance
-# get_evaluations(g1.bm)
-# get_variables_importance(g1.bm) %>% 
-#   as_tibble() %>%
-#   filter(run != "allRun") %>%
-#   ggplot(aes(x = expl.var, y = var.imp, col = run)) +
-#   facet_wrap(~ expl.var, scales = "free_x") +
-#   geom_boxplot(outlier.colour = NA) +
-#   geom_point(position = position_jitterdodge()) +
-#   theme_classic() +
-#   theme(axis.text.x = element_blank())
-
+# #' # Explore results with biomod2 functions
 # # Represent evaluation scores & variables importance
-# get_calib_lines(g1.bm) %>% plot(g1.bmd, calib.lines = .)
-# bm_PlotEvalMean(bm.out = g1.bm)
-# bm_PlotEvalBoxplot(bm.out = g1.bm, group.by = c('algo', 'algo'))
-# bm_PlotEvalBoxplot(bm.out = g1.bm, group.by = c('algo', 'run'))
-# bm_PlotVarImpBoxplot(bm.out = g1.bm, group.by = c('expl.var', 'algo', 'algo'))
-# bm_PlotVarImpBoxplot(bm.out = g1.bm, group.by = c('expl.var', 'algo', 'run'))
-# bm_PlotVarImpBoxplot(bm.out = g1.bm, group.by = c('algo', 'expl.var', 'run'))
+# get_calib_lines(bm1) %>% plot(bmd, calib.lines = .)
+# bm_PlotEvalMean(bm.out = bm1)
+# bm_PlotEvalBoxplot(bm.out = bm1, group.by = c('algo', 'algo'))
+# bm_PlotEvalBoxplot(bm.out = bm1, group.by = c('algo', 'run'))
+# bm_PlotVarImpBoxplot(bm.out = bm1, group.by = c('expl.var', 'algo', 'algo'))
+# bm_PlotVarImpBoxplot(bm.out = bm1, group.by = c('expl.var', 'algo', 'run'))
+# bm_PlotVarImpBoxplot(bm.out = bm1, group.by = c('algo', 'expl.var', 'run'))
 
 # # Represent response curves
-# bm_PlotResponseCurves(bm.out = g1.bm, 
-#                       models.chosen = get_built_models(g1.bm)[c(1:3)],
+# bm_PlotResponseCurves(bm.out = bm1,
+#                       models.chosen = get_built_models(bm1)[c(1:3)],
 #                       fixed.var = 'median')
 
 # # Plot projection
 # plot(g1_fut.bmp)
 
+#' Plot evaluation scores
+get_evaluations(bm1) %>%
+  filter(run != "allRun") %>%
+  ggplot(aes(x = run, y = validation)) +
+  facet_wrap(~metric.eval) +
+  geom_boxplot(outlier.colour = NA) +
+  geom_point(position = position_jitter(), size = 3) +
+  ggtitle(label = paste0("Population: ", pop)) +
+  theme_classic()
+
+#' Plot variables importance
+get_variables_importance(bm1) %>%
+  filter(run != "allRun") %>%
+  ggplot(aes(x = expl.var, y = var.imp, col = run)) +
+  facet_wrap(~expl.var, scales = "free_x") +
+  geom_boxplot(outlier.colour = NA) +
+  geom_point(position = position_jitterdodge()) +
+  ggtitle(label = paste0("Population: ", pop)) +
+  theme_classic() +
+  theme(axis.text.x = element_blank())
+
 #' # Plot results with terra
 op <- par(mfrow=c(1, 2))
 
 terra::plot(quadrant_map, col = "white", main = "Now")
-terra::plot(terra::unwrap(g1_curr.bmp@proj.out@val)[[3]],
+terra::plot(terra::unwrap(bmp1_curr@proj.out@val)[[3]],
   add = TRUE,
   col = colorRampPalette(c("white", "red"))(10)
 )
@@ -105,7 +113,7 @@ points(Dat %>% filter(ID == pop) %>%
 terra::plot(quadrant_map, add = TRUE, border = "dark grey")
 
 terra::plot(quadrant_map, col = "white", main = "Future")
-terra::plot(terra::unwrap(g1_fut.bmp@proj.out@val)[[3]],
+terra::plot(terra::unwrap(bmp1_fut@proj.out@val)[[3]],
   add = TRUE,
   col = colorRampPalette(c("white", "red"))(10)
 )
@@ -113,9 +121,16 @@ points(Dat %>% filter(ID == pop) %>%
   select(lon, lat), pch = 21, bg = "darkred", col = "black")
 terra::plot(quadrant_map, add = TRUE, border = "dark grey")
 
-
 op <- par(op)
 
-
-
-
+#' # Plot response curves
+bm_PlotResponseCurves(bm1,
+  models.chosen = get_built_models(bm1)[1:3],
+  fixed.var = "median",
+  do.plot = FALSE
+)$tab %>%
+  ggplot(aes(x = expl.val, y = pred.val, col = pred.name)) +
+  facet_wrap(~expl.name, scales = "free_x") +
+  geom_line() +
+  ggtitle(label = paste0("Population: ", pop)) +
+  theme_classic()
