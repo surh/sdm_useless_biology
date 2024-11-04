@@ -20,4 +20,5 @@ Based on the code from:
   * tidyterra
   * ggtext
   * maxnet
+  * ggpubr
   
