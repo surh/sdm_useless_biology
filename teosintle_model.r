@@ -1,143 +1,184 @@
+#' Looad libraries
 library(tidyverse)
+library(biomod2)
 
-#' Read data and combine bioclimatic variables with observations
+#' Read observation data, current and forecasted bioclimatic data
+#' Fore the forecast model. Instead of the CCSM4 2050 model under the rcp45
+#' scenario we use the CMCC-ESM2 model under de SSP370 scenario
 Dat <- read_csv("data/teosintle_maxent_input.csv")
 bioclim <- terra::rast("data/teosintle_bioclim_raster.tif")
-
-
-#' Run maxent
-#' 
-#' Performs variable selection and then runs maxent on presence only data
-#'
-#' @param Dat A data.frame or tibble with one row per presence
-#' observation
-#' @param bioclim A "SpatRaster" object. Should be already cropped to quadran
-#' of interest
-#' @param lon_lat A character vector with the names of the columns in Dat
-#' corresponding to longitude and latitude. I that order. 
-#'
-#' @return A MaEnt model
-#' @export
-#'
-#' @examples
-model_maxent <- function(Dat, bioclim,
-                         lon_lat = c("lon", "lat"),
-                         cor_thres = 0.7){
-  
-  # Remove colinear variables, use Variance Inflation Factor.
-  selected_vars <- fuzzySim::corSelect(data = terra::extract(x = bioclim,
-                                                            y = Dat %>%
-                                                              select(lon, lat),
-                                                            ID = FALSE),
-                      var.cols = names(bioclim),
-                      coeff = TRUE,
-                      cor.thresh = cor_thres,
-                      select = "VIF",
-                      method = "pearson")
-  bioclim <- bioclim[[selected_vars$selected.vars]]
-  
-  
-  me <- dismo::maxent(x = as(bioclim, "Raster"),
-                      p = Dat %>%
-                        select(all_of(lon_lat)) %>%
-                        as.data.frame(),
-                      nbg = 1e4)
-  
-  return(me)
-}
-
-
-#' Run models on each group and combined
-me_g1 <- model_maxent(Dat = Dat %>%
-                        filter(ID == "g1"),
-                      bioclim = bioclim,
-                      lon_lat = c("lon", "lat"),
-                      cor_thres = 0.7)
-me_g2 <-  model_maxent(Dat = Dat %>%
-                         filter(ID == "g2"),
-                       bioclim = bioclim,
-                       lon_lat = c("lon", "lat"),
-                       cor_thres = 0.7)
-me_all <-  model_maxent(Dat = Dat %>%
-                          filter(ID == "all"),
-                        bioclim = bioclim,
-                        lon_lat = c("lon", "lat"),
-                        cor_thres = 0.7)
-op <- par(mfrow = c(1, 3))
-dismo::plot(me_g1)
-dismo::plot(me_g2)
-dismo::plot(me_all)
-par(op)
-
-g1_pred <- terra::predict(as(bioclim, "Raster"), me_g1)
-g2_pred <- terra::predict(as(bioclim, "Raster"), me_g2)
-
-#' Forecast into the future
-bioclim6180 <- terra::rast("data/teosintle_forecast_2061-2080_raster.tif")
-bioclim81100 <- terra::rast("data/teosintle_forecast_2081-2100_raster.tif")
-
-g1_forecast_6180 <- terra::predict(as(bioclim6180, "Raster"), me_g1)
-g1_forecast_81100 <- terra::predict(as(bioclim81100, "Raster"), me_g1)
-
-
-g2_forecast_6180 <- terra::predict(as(bioclim6180, "Raster"), me_g2)
-g2_forecast_81100 <- terra::predict(as(bioclim81100, "Raster"), me_g2)
-
-#' Read map and plot
+bioclim_fut <- terra::rast("forecasts/teosintle_forecast_2061-2080_370_CMCC-ESM2.tif")
+names(bioclim_fut) <- names(bioclim) # Make sure the names are the same!!
 quadrant_map <- terra::vect("data/teosintle_map/")
 
+#' # Using the biomod2 package
 
-op <- par(mfrow=c(3,2))
+pop <- "g1"
+
+#' Prepare data
+bmd <- BIOMOD_FormatingData(
+  resp.var = rep(1, sum(Dat$ID == pop)),
+  expl.var = bioclim,
+  resp.xy = Dat %>% filter(ID == pop) %>% select(lon, lat),
+  resp.name = pop,
+  PA.nb.rep = 4,
+  PA.nb.absences = 1000,
+  PA.strategy = "random",
+  filter.raster = TRUE
+)
+
+#' Run models
+bm1 <- BIOMOD_Modeling(
+  bm.format = bmd,
+  modeling.id = paste0(pop, ".bm"),
+  models = c("MAXNET"),
+  CV.strategy = "random",
+  CV.nb.rep = 2,
+  CV.perc = 0.8,
+  metric.eval = c("ROC", "TSS"),
+  # OPT.strategy = "tuned", # Normally you should tune the models
+  var.import = 3
+)
+
+#' Project models
+bmp1_curr <- BIOMOD_Projection(
+  bm.mod = bm1,
+  proj.name = "Now",
+  new.env = bioclim,
+  models.chosen = "all",
+  metric.binary = "all",
+  metric.filter = "all",
+  build.clamping.mask = TRUE
+)
+
+bmp1_fut <- BIOMOD_Projection(
+  bm.mod = bm1,
+  proj.name = "Future",
+  new.env = bioclim_fut,
+  models.chosen = "all",
+  metric.binary = "all",
+  metric.filter = "all",
+  build.clamping.mask = TRUE
+)
+
+# #' # Explore results with biomod2 functions
+# # Represent evaluation scores & variables importance
+# get_calib_lines(bm1) %>% plot(bmd, calib.lines = .)
+# bm_PlotEvalMean(bm.out = bm1)
+# bm_PlotEvalBoxplot(bm.out = bm1, group.by = c('algo', 'algo'))
+# bm_PlotEvalBoxplot(bm.out = bm1, group.by = c('algo', 'run'))
+# bm_PlotVarImpBoxplot(bm.out = bm1, group.by = c('expl.var', 'algo', 'algo'))
+# bm_PlotVarImpBoxplot(bm.out = bm1, group.by = c('expl.var', 'algo', 'run'))
+# bm_PlotVarImpBoxplot(bm.out = bm1, group.by = c('algo', 'expl.var', 'run'))
+
+# # Represent response curves
+# bm_PlotResponseCurves(bm.out = bm1,
+#                       models.chosen = get_built_models(bm1)[c(1:3)],
+#                       fixed.var = 'median')
+
+# # Plot projection
+# plot(g1_fut.bmp)
+
+# # Plot range size
+# bm_PlotRangeSize(BIOMOD_RangeSize(
+#   proj.current = get_predictions(bmp1_curr,
+#     metric.binary = "TSS",
+#     model.as.col = TRUE
+#   ),
+#   proj.future = get_predictions(bmp1_fut,
+#     metric.binary = "TSS",
+#     model.as.col = TRUE
+#   )
+# ))
+
+#' Plot evaluation scores
+get_evaluations(bm1) %>%
+  filter(run != "allRun") %>%
+  ggplot(aes(x = run, y = validation)) +
+  facet_wrap(~metric.eval) +
+  geom_boxplot(outlier.colour = NA) +
+  geom_point(position = position_jitter(), size = 3) +
+  ggtitle(label = paste0("Population: ", pop)) +
+  theme_classic()
+
+#' Plot variables importance
+get_variables_importance(bm1) %>%
+  filter(run != "allRun") %>%
+  ggplot(aes(x = expl.var, y = var.imp, col = run)) +
+  facet_wrap(~expl.var, scales = "free_x") +
+  geom_boxplot(outlier.colour = NA) +
+  geom_point(position = position_jitterdodge()) +
+  ggtitle(label = paste0("Population: ", pop)) +
+  theme_classic() +
+  theme(axis.text.x = element_blank())
+
+#' # Plot results with terra
+op <- par(mfrow=c(1, 2))
+
 terra::plot(quadrant_map, col = "white", main = "Now")
-terra::plot(g1_pred, add = TRUE, col = colorRampPalette(c("white", "red"))(10))
-points(Dat %>% filter(ID == "g1") %>% select(lon, lat), pch = 21, bg = "darkred", col = "black")
-terra::plot(quadrant_map, add=TRUE, border='dark grey')
+terra::plot(terra::unwrap(bmp1_curr@proj.out@val)[[3]],
+  add = TRUE,
+  col = colorRampPalette(c("white", "red"))(10)
+)
+points(Dat %>% filter(ID == pop) %>%
+  select(lon, lat), pch = 21, bg = "darkred", col = "black")
+terra::plot(quadrant_map, add = TRUE, border = "dark grey")
 
-terra::plot(quadrant_map, col = "white", main = "now")
-terra::plot(g2_pred, add = TRUE, col = colorRampPalette(c("white", "blue"))(10))
-points(Dat %>% filter(ID == "g2") %>% select(lon, lat), pch = 21, bg = "darkblue", col = "black")
-terra::plot(quadrant_map, add=TRUE, border='dark grey')
+terra::plot(quadrant_map, col = "white", main = "Future")
+terra::plot(terra::unwrap(bmp1_fut@proj.out@val)[[3]],
+  add = TRUE,
+  col = colorRampPalette(c("white", "red"))(10)
+)
+points(Dat %>% filter(ID == pop) %>%
+  select(lon, lat), pch = 21, bg = "darkred", col = "black")
+terra::plot(quadrant_map, add = TRUE, border = "dark grey")
 
+op <- par(op)
 
+#' # Plot response curves
+bm_PlotResponseCurves(bm1,
+  models.chosen = get_built_models(bm1)[1:3],
+  fixed.var = "median",
+  do.plot = FALSE
+)$tab %>%
+  ggplot(aes(x = expl.val, y = pred.val, col = pred.name)) +
+  facet_wrap(~expl.name, scales = "free_x") +
+  geom_line() +
+  ggtitle(label = paste0("Population: ", pop)) +
+  theme_classic()
 
-terra::plot(quadrant_map, col = "white", main = "2061-2080")
-terra::plot(g1_forecast_6180, add = TRUE, col = colorRampPalette(c("white", "red"))(10))
-points(Dat %>% filter(ID == "g1") %>% select(lon, lat), pch = 21, bg = "darkred", col = "black")
-terra::plot(quadrant_map, add=TRUE, border='dark grey')
+#' # Plot range size
 
-terra::plot(quadrant_map, col = "white", main = "2061-2081")
-terra::plot(g2_forecast_6180, add = TRUE, col = colorRampPalette(c("white", "blue"))(10))
-points(Dat %>% filter(ID == "g2") %>% select(lon, lat), pch = 21, bg = "darkblue", col = "black")
-terra::plot(quadrant_map, add=TRUE, border='dark grey')
-
-
-
-terra::plot(quadrant_map, col = "white", main = "2081-2100")
-terra::plot(g1_forecast_81100, add = TRUE, col = colorRampPalette(c("white", "red"))(10))
-points(Dat %>% filter(ID == "g1") %>% select(lon, lat), pch = 21, bg = "darkred", col = "black")
-terra::plot(quadrant_map, add=TRUE, border='dark grey')
-
-terra::plot(quadrant_map, col = "white", main = "2081-2100")
-terra::plot(g2_forecast_81100, add = TRUE, col = colorRampPalette(c("white", "blue"))(10))
-points(Dat %>% filter(ID == "g2") %>% select(lon, lat), pch = 21, bg = "darkblue", col = "black")
-terra::plot(quadrant_map, add=TRUE, border='dark grey')
-par(op)
-
-
-
-#' For more systematic evaluation of the models
-#' Takes a while to run
-# eval <- ENMeval::ENMevaluate(occs = Dat %>% filter(ID == "g1") %>% select(lon, lat) %>% as.data.frame(),
-#                      envs = as(bioclim , "Raster"),
-#                      tune.args = list(rm = c(0.5, 1 , 1.5),
-#                                       fc = unlist(sapply(1:5, function(x) apply(combn(c("L","Q","H","P","T"), x), 2, function(y) paste(y, collapse = ""))))),
-#                      bg.coords = NULL,
-#                      clamp=FALSE,
-#             algorithm = "maxnet",
-#             method = 'jackknife',
-#             parallel = TRUE,
-#             numCores = 8)
-
+BIOMOD_RangeSize(
+  proj.current = get_predictions(bmp1_curr,
+    metric.binary = "TSS",
+    model.as.col = TRUE
+  ),
+  proj.future = get_predictions(bmp1_fut,
+    metric.binary = "TSS",
+    model.as.col = TRUE
+  )
+)$Compt.By.Models %>%
+  as.data.frame() %>%
+  rownames_to_column(var = "meta") %>%
+  as_tibble() %>%
+  separate(meta,
+    into = c("spec", "pa_group", "run", "model"),
+    sep = "_"
+  ) %>%
+  filter(run != "allRun") %>%
+  mutate(id = paste0(pa_group, "_", run)) %>%
+  select(id, run, Stable1, Gain, Loss) %>%
+  pivot_longer(
+    cols = -c("run", "id"),
+    names_to = "type",
+    values_to = "n_pixels"
+  ) %>%
+  mutate(type = factor(type, levels = c("Loss", "Stable1", "Gain"))) %>%
+  ggplot(aes(x = run, y = n_pixels, fill = type)) +
+  geom_bar(stat = "identity", position = "fill", col = NA) +
+  ggtitle(label = paste0("Population: ", pop)) +
+  theme_classic()
 
 
 
