@@ -56,7 +56,7 @@ time <- c("2041-2060", "2061-2080", "2081-2100") # Ignoring period 2021-2040
 #' timeframes. Crop each forecast the species quadrant, and save for future use.
 #' This will take a long time to run (~440 MB per combination, 129 GB total)
 expand.grid(model = model, ssp = ssp, time = time) %>%
-  mutate(path = paste0("data/teosintle_forecast_",
+  mutate(path = paste0("forecasts/teosintle_forecast_",
                        time, "_", ssp, "_", model, ".tif")) %>%
   rowwise() %>%
   mutate(forecast = list(geodata::cmip6_world(model = model,
