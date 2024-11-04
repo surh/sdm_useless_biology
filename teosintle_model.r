@@ -7,7 +7,7 @@ library(biomod2)
 #' scenario we use the CMCC-ESM2 model under de SSP370 scenario
 Dat <- read_csv("data/teosintle_maxent_input.csv")
 bioclim <- terra::rast("data/teosintle_bioclim_raster.tif")
-bioclim_fut <- terra::rast("data/teosintle_forecast_2061-2080_370_CMCC-ESM2.tif")
+bioclim_fut <- terra::rast("forecasts/teosintle_forecast_2061-2080_370_CMCC-ESM2.tif")
 names(bioclim_fut) <- names(bioclim) # Make sure the names are the same!!
 quadrant_map <- terra::vect("data/teosintle_map/")
 
@@ -79,6 +79,18 @@ bmp1_fut <- BIOMOD_Projection(
 # # Plot projection
 # plot(g1_fut.bmp)
 
+# # Plot range size
+# bm_PlotRangeSize(BIOMOD_RangeSize(
+#   proj.current = get_predictions(bmp1_curr,
+#     metric.binary = "TSS",
+#     model.as.col = TRUE
+#   ),
+#   proj.future = get_predictions(bmp1_fut,
+#     metric.binary = "TSS",
+#     model.as.col = TRUE
+#   )
+# ))
+
 #' Plot evaluation scores
 get_evaluations(bm1) %>%
   filter(run != "allRun") %>%
@@ -135,21 +147,6 @@ bm_PlotResponseCurves(bm1,
   ggtitle(label = paste0("Population: ", pop)) +
   theme_classic()
 
-
-bm_PlotRangeSize(bm1, do.plot = FALSE)
-
-
-bm_PlotRangeSize(BIOMOD_RangeSize(
-  proj.current = get_predictions(bmp1_curr,
-    metric.binary = "TSS",
-    model.as.col = TRUE
-  ),
-  proj.future = get_predictions(bmp1_fut,
-    metric.binary = "TSS",
-    model.as.col = TRUE
-  )
-))
-
 #' # Plot range size
 
 BIOMOD_RangeSize(
@@ -177,8 +174,9 @@ BIOMOD_RangeSize(
     names_to = "type",
     values_to = "n_pixels"
   ) %>%
+  mutate(type = factor(type, levels = c("Loss", "Stable1", "Gain"))) %>%
   ggplot(aes(x = run, y = n_pixels, fill = type)) +
-  geom_bar(stat = "identity", position = "fill") +
+  geom_bar(stat = "identity", position = "fill", col = NA) +
   ggtitle(label = paste0("Population: ", pop)) +
   theme_classic()
 
