@@ -134,3 +134,18 @@ bm_PlotResponseCurves(bm1,
   geom_line() +
   ggtitle(label = paste0("Population: ", pop)) +
   theme_classic()
+
+
+bm_PlotRangeSize(bm1, do.plot = FALSE)
+
+
+bm_PlotRangeSize(BIOMOD_RangeSize(
+  proj.current = get_predictions(bmp1_curr,
+    metric.binary = "TSS",
+    model.as.col = TRUE
+  ),
+  proj.future = get_predictions(bmp1_fut,
+    metric.binary = "TSS",
+    model.as.col = TRUE
+  )
+))
