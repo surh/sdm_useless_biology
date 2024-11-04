@@ -149,3 +149,38 @@ bm_PlotRangeSize(BIOMOD_RangeSize(
     model.as.col = TRUE
   )
 ))
+
+#' # Plot range size
+
+BIOMOD_RangeSize(
+  proj.current = get_predictions(bmp1_curr,
+    metric.binary = "TSS",
+    model.as.col = TRUE
+  ),
+  proj.future = get_predictions(bmp1_fut,
+    metric.binary = "TSS",
+    model.as.col = TRUE
+  )
+)$Compt.By.Models %>%
+  as.data.frame() %>%
+  rownames_to_column(var = "meta") %>%
+  as_tibble() %>%
+  separate(meta,
+    into = c("spec", "pa_group", "run", "model"),
+    sep = "_"
+  ) %>%
+  filter(run != "allRun") %>%
+  mutate(id = paste0(pa_group, "_", run)) %>%
+  select(id, run, Stable1, Gain, Loss) %>%
+  pivot_longer(
+    cols = -c("run", "id"),
+    names_to = "type",
+    values_to = "n_pixels"
+  ) %>%
+  ggplot(aes(x = run, y = n_pixels, fill = type)) +
+  geom_bar(stat = "identity", position = "fill") +
+  ggtitle(label = paste0("Population: ", pop)) +
+  theme_classic()
+
+
+
