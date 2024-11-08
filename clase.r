@@ -68,7 +68,16 @@ model_scenario <- function(Dat, bioclim, bioclim_fut, pop){
     ))
 }
 
-calc_loss <- function(res) {
+
+#' Calculate area change
+#'
+#' This function calculates forecasted area change (in pixels) under a
+#' specific future scenario
+#'
+#' @param res List with the results of the model produced by model_scenario()
+#' @return Data frame with the number of pixels that are forecasted to be
+#' lost, gained, or remain stable
+calc_change <- function(res) {
     BIOMOD_RangeSize(
         proj.current = get_predictions(res$bmp_curr,
             metric.binary = "TSS",
@@ -92,51 +101,65 @@ calc_loss <- function(res) {
         pivot_longer(
             cols = -c("run", "id"),
             names_to = "type",
-            values_to = "perc_pixels"
+            values_to = "n_pixels"
         ) %>%
         mutate(type = factor(type, levels = c("Loss", "Stable1", "Gain")))
-    
 }
 
-
-
+#' Read input data for current pops
 Dat <- read_csv("data/teosintle_maxent_input.csv")
-bioclim <- terra::rast("d2080ata/teosintle_bioclim_raster.tif")
+bioclim <- terra::rast("data/teosintle_bioclim_raster.tif")
 quadrant_map <- terra::vect("data/teosintle_map/")
 
+#' Lit all forecast files, and select those for the 2061-2080 period
 forecast_files <- list.files("forecasts/") 
 forecast_files <- forecast_files[str_detect(forecast_files, "_2061-2080")]
 
-
+#' Loop over forecast files, fit the maxent sdm model, and calculate the area
+#' change for each population and scenario.
 Res <- NULL
-for (forecast_file in forecast_files[sample(1:length(forecast_files), 10)]) {
-    # forecast_file <- forecast_files[1]
-    bioclim_fut <- terra::rast(file.path("forecasts", forecast_file))
-    names(bioclim_fut) <- names(bioclim) # Make sure the names are the same!!
+# for (forecast_file in forecast_files[sample(1:length(forecast_files), 3)]) {
+for (forecast_file in forecast_files) {
+  # forecast_file <- forecast_files[1]
+  bioclim_fut <- terra::rast(file.path("forecasts", forecast_file))
+  names(bioclim_fut) <- names(bioclim) # Make sure the names are the same!!
 
-    res_g1 <- model_scenario(bioclim, bioclim_fut, "g1")
-    res_g2 <- model_scenario(bioclim, bioclim_fut, "g2")
+  # Model each population
+  res_g1 <- model_scenario(Dat, bioclim, bioclim_fut, "g1")
+  res_g2 <- model_scenario(Dat, bioclim, bioclim_fut, "g2")
 
-    loss_g1 <- calc_loss(res_g1)
-    loss_g2 <- calc_loss(res_g2)
+  # Calculate area change for each population
+  loss_g1 <- calc_change(res_g1)
+  loss_g2 <- calc_change(res_g2)
 
-    res <- loss_g1 %>%
-        filter(type == "Loss") %>%
-        mutate(pop = "g1") %>%
-        bind_rows(
-            loss_g2 %>%
-                filter(type == "Loss") %>%
-                mutate(pop = "g2")
-        ) %>%
-        mutate(model = forecast_file)
-
-    Res <- bind_rows(Res, res)
+  # Combine results
+  res <- loss_g1 %>%
+      filter(type == "Loss") %>%
+      mutate(pop = "g1") %>%
+      bind_rows(
+          loss_g2 %>%
+              filter(type == "Loss") %>%
+              mutate(pop = "g2")
+      ) %>%
+      mutate(model = forecast_file)
+  
+  # Store results
+  Res <- bind_rows(Res, res)
 }
 
-
 Res
-
-
+Res %>%
+    separate(model,
+        into = c("species", "forecast", "years", "ssp", "model"),
+        sep = "_"
+    ) %>%
+    select(-species, -forecast) %>%
+    mutate(model = str_remove(model, ".tif$")) %>%
+    ggplot(aes(x = pop, y = n_pixels)) +
+    facet_wrap(~ssp) +
+    geom_boxplot(outlier.color = NA) +
+    geom_point(aes(color = model), position = position_jitter(width = 0.2)) +
+    theme_classic()
 
 
 
