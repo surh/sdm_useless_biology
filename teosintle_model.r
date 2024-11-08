@@ -173,16 +173,16 @@ BIOMOD_RangeSize(
   pivot_longer(
     cols = -c("run", "id"),
     names_to = "type",
-    values_to = "perc_pixels"
+    values_to = "n_pixels"
   ) %>%
-  mutate(type = factor(type, levels = c("Loss", "Stable1", "Gain"))) %>%
-  ggplot(aes(x = run, y = perc_pixels, fill = type)) +
+  mutate(type = factor(type2080, levels = c("Loss", "Stable1", "Gain"))) %>%
+  ggplot(aes(x = run, y = n_pixels, fill = type)) +
   geom_bar(stat = "identity", position = "fill", col = NA) +
   ggtitle(label = paste0("Population: ", pop)) +
+  ylab("Proportion of pixels") +
   theme_classic()
 
 
-
 # Y la población g2?
-# Qué tan robuto son los resultado ante lo diferentes escenarios
+# Qué tan robustos son los resultado ante lo diferentes escenarios
 # climático futuros?
