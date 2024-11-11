@@ -147,8 +147,9 @@ for (forecast_file in forecast_files) {
   Res <- bind_rows(Res, res)
 }
 
+# Plot results
 Res
-Res %>%
+p1 <- Res %>%
     separate(model,
         into = c("species", "forecast", "years", "ssp", "model"),
         sep = "_"
@@ -158,9 +159,18 @@ Res %>%
     ggplot(aes(x = pop, y = n_pixels)) +
     facet_wrap(~ssp) +
     geom_boxplot(outlier.color = NA) +
-    geom_point(aes(color = model), position = position_jitter(width = 0.2)) +
+    geom_point(aes(color = model),
+        position = position_jitter(width = 0.2),
+        size = 0.5
+    ) +
+    geom_hline(yintercept = 500) +
+    labs(
+        title = "Area loss proyected in 2061-2080",
+        y = "Number of pixels lost", x = "Population"
+    ) +
     theme_classic()
-
+p1
+ggsave("teosintle_area_loss.png", p1, width = 10, height = 5)
 
 
 
