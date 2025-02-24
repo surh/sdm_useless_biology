@@ -179,6 +179,3 @@ BIOMOD_RangeSize(
   geom_bar(stat = "identity", position = "fill", col = NA) +
   ggtitle(label = paste0("Population: ", pop)) +
   theme_classic()
-
-
-
