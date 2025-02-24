@@ -145,7 +145,8 @@ bm_PlotResponseCurves(bm1,
   facet_wrap(~expl.name, scales = "free_x") +
   geom_line() +
   ggtitle(label = paste0("Population: ", pop)) +
-  theme_classic()
+  theme_classic() +
+  theme(axis.text.x = element_text(angle = 90))
 
 #' # Plot range size
 
@@ -174,8 +175,14 @@ BIOMOD_RangeSize(
     names_to = "type",
     values_to = "n_pixels"
   ) %>%
-  mutate(type = factor(type, levels = c("Loss", "Stable1", "Gain"))) %>%
+  mutate(type = factor(type2080, levels = c("Loss", "Stable1", "Gain"))) %>%
   ggplot(aes(x = run, y = n_pixels, fill = type)) +
   geom_bar(stat = "identity", position = "fill", col = NA) +
   ggtitle(label = paste0("Population: ", pop)) +
+  ylab("Proportion of pixels") +
   theme_classic()
+
+
+# Y la población g2?
+# Qué tan robustos son los resultado ante lo diferentes escenarios
+# climático futuros?
